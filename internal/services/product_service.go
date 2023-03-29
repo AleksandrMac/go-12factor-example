@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-//ProductService api controller of produces
+// ProductService api controller of produces
 type ProductService interface {
 	FindAll(pageable dto.Pageable) (*[]entities.Product, error)
 	GetProduct(id string) (*entities.Product, error)
@@ -42,11 +42,11 @@ func (p productService) GetProduct(id string) (*entities.Product, error) {
 }
 
 func (p productService) DeleteProduct(id string) error {
-	log.Info("Delete product id=", id)
+	log.Info("Delete product id=" + id)
 	tx := p.db.Begin()
 	rs := tx.Delete(&entities.Product{Model: entities.Model{ID: id}}).Where("id=?", id)
 	if rs.Error != nil {
-		log.Error("fail to delete product:", rs.Error)
+		log.Error("fail to delete product:" + rs.Error.Error())
 		tx.Rollback()
 		return errors.New("can't delete product")
 	}

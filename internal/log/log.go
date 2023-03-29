@@ -1,77 +1,180 @@
 package log
 
 import (
+	"io"
 	"os"
+	"time"
 
-	"github.com/op/go-logging"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-// Example format string. Everything except the message has a custom color
-// which is dependent on the log level. Many fields have a custom output
-// formatting too, eg. the time returns the hour down to the milli second.
-var format = logging.MustStringFormatter(
-	`%{color}[%{time:15:04:05.000}] %{longfile} %{longfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
+type Level = zapcore.Level
+
+const (
+	InfoLevel   Level = zap.InfoLevel   // 0, default level
+	WarnLevel   Level = zap.WarnLevel   // 1
+	ErrorLevel  Level = zap.ErrorLevel  // 2
+	DPanicLevel Level = zap.DPanicLevel // 3, used in development log
+	// PanicLevel logs a message, then panics
+	PanicLevel Level = zap.PanicLevel // 4
+	// FatalLevel logs a message, then calls os.Exit(1).
+	FatalLevel Level = zap.FatalLevel // 5
+	DebugLevel Level = zap.DebugLevel // -1
 )
 
-// GetLogger new logger
-func GetLogger(name string) *logging.Logger {
-	if name == "" {
-		name = "server"
-	}
-	stdoutBE := logging.NewLogBackend(os.Stdout, "", 0)
-	beFormat := logging.NewBackendFormatter(stdoutBE, format)
-	logging.SetBackend(beFormat)
-	var log1 = logging.MustGetLogger(name)
-	return log1
+type Field = zap.Field
+
+func (l *Logger) Debug(msg string, fields ...Field) {
+	l.l.Debug(msg, fields...)
 }
 
-// Default logger
-var Default = GetLogger("server")
+func (l *Logger) Info(msg string, fields ...Field) {
+	l.l.Info(msg, fields...)
+}
 
-// Error logs a message using ERROR as log level.
-var Error = Default.Error
+func (l *Logger) Warn(msg string, fields ...Field) {
+	l.l.Warn(msg, fields...)
+}
 
-// Errorf logs a message using ERROR as log level.
-var Errorf = Default.Errorf
+func (l *Logger) Error(msg string, fields ...Field) {
+	l.l.Error(msg, fields...)
+}
+func (l *Logger) DPanic(msg string, fields ...Field) {
+	l.l.DPanic(msg, fields...)
+}
+func (l *Logger) Panic(msg string, fields ...Field) {
+	l.l.Panic(msg, fields...)
+}
+func (l *Logger) Fatal(msg string, fields ...Field) {
+	l.l.Fatal(msg, fields...)
+}
 
-// Info logs a message using INFO as log level.
-var Info = Default.Info
+// function variables for all field types
+// in github.com/uber-go/zap/field.go
 
-// Infof logs a message using INFO as log level.
-var Infof = Default.Infof
+var (
+	Skip        = zap.Skip
+	Binary      = zap.Binary
+	Bool        = zap.Bool
+	Boolp       = zap.Boolp
+	ByteString  = zap.ByteString
+	Complex128  = zap.Complex128
+	Complex128p = zap.Complex128p
+	Complex64   = zap.Complex64
+	Complex64p  = zap.Complex64p
+	Float64     = zap.Float64
+	Float64p    = zap.Float64p
+	Float32     = zap.Float32
+	Float32p    = zap.Float32p
+	Int         = zap.Int
+	Intp        = zap.Intp
+	Int64       = zap.Int64
+	Int64p      = zap.Int64p
+	Int32       = zap.Int32
+	Int32p      = zap.Int32p
+	Int16       = zap.Int16
+	Int16p      = zap.Int16p
+	Int8        = zap.Int8
+	Int8p       = zap.Int8p
+	String      = zap.String
+	Stringp     = zap.Stringp
+	Uint        = zap.Uint
+	Uintp       = zap.Uintp
+	Uint64      = zap.Uint64
+	Uint64p     = zap.Uint64p
+	Uint32      = zap.Uint32
+	Uint32p     = zap.Uint32p
+	Uint16      = zap.Uint16
+	Uint16p     = zap.Uint16p
+	Uint8       = zap.Uint8
+	Uint8p      = zap.Uint8p
+	Uintptr     = zap.Uintptr
+	Uintptrp    = zap.Uintptrp
+	Reflect     = zap.Reflect
+	Namespace   = zap.Namespace
+	Stringer    = zap.Stringer
+	Time        = zap.Time
+	Timep       = zap.Timep
+	Stack       = zap.Stack
+	StackSkip   = zap.StackSkip
+	Duration    = zap.Duration
+	Durationp   = zap.Durationp
+	Any         = zap.Any
 
-// Debug logs a message using DEBUG as log level.
-var Debug = Default.Debug
+	Info   = std.Info
+	Warn   = std.Warn
+	Error  = std.Error
+	DPanic = std.DPanic
+	Panic  = std.Panic
+	Fatal  = std.Fatal
+	Debug  = std.Debug
+)
 
-// Debugf logs a message using DEBUG as log level.
-var Debugf = Default.Debugf
+// not safe for concurrent use
+func ResetDefault(l *Logger) {
+	std = l
+	Info = std.Info
+	Warn = std.Warn
+	Error = std.Error
+	DPanic = std.DPanic
+	Panic = std.Panic
+	Fatal = std.Fatal
+	Debug = std.Debug
+}
 
-// Critical logs a message using CRITICAL as log level.
-var Critical = Default.Critical
+type Logger struct {
+	l     *zap.Logger // zap ensure that zap.Logger is safe for concurrent use
+	level Level
+}
 
-// Criticalf logs a message using CRITICAL as log level.
-var Criticalf = Default.Criticalf
+var std = New(os.Stderr, zap.NewProductionConfig(), WithCaller(true))
 
-// Warning logs a message using WARNING as log level.
-var Warning = Default.Warning
+func Default() *Logger {
+	return std
+}
 
-// Warningf logs a message using WARNING as log level.
-var Warningf = Default.Warningf
+type Option = zap.Option
 
-// Notice logs a message using NOTICE as log level.
-var Notice = Default.Notice
+var (
+	WithCaller    = zap.WithCaller
+	AddStacktrace = zap.AddStacktrace
+)
 
-// Noticef logs a message using NOTICE as log level.
-var Noticef = Default.Noticef
+// New create a new logger (not support log rotating).
+func New(writer io.Writer, conf zap.Config, opts ...Option) *Logger {
+	if writer == nil {
+		panic("the writer is nil")
+	}
+	var cfg zap.Config
+	if conf.Development {
+		cfg = zap.NewDevelopmentConfig()
+	} else {
+		cfg = zap.NewProductionConfig()
+	}
+	cfg.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString(t.Format("2006-01-02T15:04:05.000Z0700"))
+	}
 
-// Panic is equivalent to l.Critical(fmt.Sprint()) followed by a call to panic().
-var Panic = Default.Panic
+	core := zapcore.NewCore(
+		zapcore.NewJSONEncoder(cfg.EncoderConfig),
+		zapcore.AddSync(writer),
+		zapcore.Level(conf.Level.Level()),
+	)
+	logger := &Logger{
+		l:     zap.New(core, opts...),
+		level: Level(conf.Level.Level()),
+	}
+	return logger
+}
 
-// Panicf is equivalent to l.Critical followed by a call to panic().
-var Panicf = Default.Panicf
+func (l *Logger) Sync() error {
+	return l.l.Sync()
+}
 
-// Fatal is equivalent to l.Critical(fmt.Sprint()) followed by a call to os.Exit(1).
-var Fatal = Default.Fatal
-
-// Fatalf is equivalent to l.Critical followed by a call to os.Exit(1).
-var Fatalf = Default.Fatalf
+func Sync() error {
+	if std != nil {
+		return std.Sync()
+	}
+	return nil
+}

@@ -8,6 +8,9 @@ import (
 	"go-example/internal/entities"
 	"go-example/internal/errors"
 	"go-example/internal/log"
+	"os"
+
+	// "go-example/internal/log"
 	"strings"
 
 	"github.com/gin-contrib/pprof"
@@ -31,7 +34,7 @@ var (
 )
 
 func init() {
-	cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(initConfig, initLogger)
 	rootCmd.AddCommand(startCmd)
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "", "config file (default is $PWD/config/default.yaml)")
 	startCmd.PersistentFlags().Int("port", 5000, "Port to run Application server on")
@@ -40,6 +43,7 @@ func init() {
 }
 
 func initConfig() {
+	defer log.Sync()
 	if len(configPath) != 0 {
 		config.Viper().SetConfigFile(configPath)
 	} else {
@@ -49,16 +53,22 @@ func initConfig() {
 	config.Viper().SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	config.Viper().AutomaticEnv()
 	if err := config.Viper().ReadInConfig(); err != nil {
-		log.Fatalf("Load config from file [%s]: %v", config.Viper().ConfigFileUsed(), err)
+		log.Fatal(
+			fmt.Sprintf("Load config from file [%s]: %v", config.Viper().ConfigFileUsed(), err))
 	}
 	config.Parse()
 }
 
+func initLogger() {
+	log.ResetDefault(log.New(os.Stderr, config.Default.Log))
+}
+
 func startServer(cmd *cobra.Command, agrs []string) {
+
 	log.Info("Start http-server")
 	db, err := gorm.Open(postgres.Open(config.Default.Database.URL))
 	if err != nil {
-		log.Fatal("Failed to connect database: ", err)
+		log.Fatal(fmt.Sprint("Failed to connect database: ", err))
 	}
 	sqlDB, err := db.DB()
 	if err != nil {

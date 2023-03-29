@@ -2,9 +2,12 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"go-example/internal/log"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 var viperInstance = viper.New()
@@ -26,6 +29,7 @@ type Config struct {
 			Max uint
 		}
 	}
+	Log zap.Config
 }
 
 func (d Config) String() string {
@@ -35,8 +39,9 @@ func (d Config) String() string {
 
 // Parse get all config support in app
 func Parse() Config {
-	if err := viperInstance.Unmarshal(&Default); err != nil {
-		log.Fatal("Fail to read configuration", err)
+	if err := viperInstance.Unmarshal(&Default, viper.DecodeHook(mapstructure.TextUnmarshallerHookFunc())); err != nil {
+		log.Fatal(
+			fmt.Sprintf("Fail to read configuration: %s", err.Error()))
 	}
 	return Default
 }

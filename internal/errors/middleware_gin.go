@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"fmt"
 	"go-example/internal/dto"
 	"go-example/internal/log"
 	"net/http"
@@ -20,11 +21,13 @@ func GinError() gin.HandlerFunc {
 		if errors := c.Errors.ByType(gin.ErrorTypeAny); len(errors) > 0 {
 			err := errors[0].Err
 			if err, ok := err.(*Error); ok {
-				log.Error(tagAppError, err)
+				log.Error(
+					fmt.Sprintf("%s: %s", tagAppError, err))
 				c.AbortWithStatusJSON(err.Code, err.ToReply())
 				return
 			}
-			log.Error(tagUnhandlerError, err)
+			log.Error(
+				fmt.Sprintf("%s: %s", tagUnhandlerError, err))
 			c.AbortWithStatusJSON(http.StatusInternalServerError, ErrReplyUnknown)
 			return
 		}
