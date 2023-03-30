@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"go-example/docs"
 	v1 "go-example/internal/api/v1"
@@ -8,7 +9,10 @@ import (
 	"go-example/internal/entities"
 	"go-example/internal/errors"
 	"go-example/internal/log"
+	internalTrace "go-example/internal/trace"
 	"os"
+	"os/signal"
+	"time"
 
 	// "go-example/internal/log"
 	"strings"
@@ -16,8 +20,11 @@ import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
+	swaggerFiles "github.com/swaggo/files"
 	swagger "github.com/swaggo/gin-swagger"
-	"github.com/swaggo/gin-swagger/swaggerFiles"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -60,10 +67,39 @@ func initConfig() {
 }
 
 func initLogger() {
-	log.ResetDefault(log.New(os.Stderr, config.Default.Log))
+	log.ResetDefault(log.New(os.Stderr, config.Default.Otel.Log))
 }
 
 func startServer(cmd *cobra.Command, agrs []string) {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	observabilityCloser := initObservability(ctx)
+	defer observabilityCloser(ctx)
+
+	tracer := otel.Tracer("test-tracer")
+
+	// Attributes represent additional key-value descriptors that can be bound
+	// to a metric observer or recorder.
+	commonAttrs := []attribute.KeyValue{
+		attribute.String("attrA", "chocolate"),
+		attribute.String("attrB", "raspberry"),
+		attribute.String("attrC", "vanilla"),
+	}
+
+	// work begins
+	ctx, span := tracer.Start(
+		ctx,
+		"CollectorExporter-Example",
+		trace.WithAttributes(commonAttrs...))
+	defer span.End()
+	for i := 0; i < 10; i++ {
+		_, iSpan := tracer.Start(ctx, fmt.Sprintf("Sample-%d", i))
+		log.Info(fmt.Sprintf("Doing really hard work (%d / 10)\n", i+1))
+
+		<-time.After(time.Second)
+		iSpan.End()
+	}
 
 	log.Info("Start http-server")
 	db, err := gorm.Open(postgres.Open(config.Default.Database.URL))
@@ -103,4 +139,32 @@ func setupDoc() {
 	docs.SwaggerInfo.Host = fmt.Sprintf("%s:%d", config.Default.Server.Host, config.Default.Server.Port)
 	docs.SwaggerInfo.BasePath = "/api/v1"
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
+}
+
+func initObservability(ctx context.Context) (close func(context.Context)) {
+	closedFns := []func(context.Context){}
+
+	// tracer initialization
+	log.Info("Start trace provider")
+	shutdown, err := internalTrace.InitTraceProvider(config.Default.Metadata.ServiceName, Version, config.Default.Otel.Trace)
+	if err != nil {
+		if err != internalTrace.ErrUndefindedTraceProto {
+			log.Fatal(err.Error())
+		}
+		log.Info(err.Error())
+	}
+
+	if shutdown != nil {
+		closedFns = append(closedFns, func(ctx context.Context) {
+			if err := shutdown(ctx); err != nil {
+				log.Fatal("failed to shutdown TracerProvider: " + err.Error())
+			}
+		})
+	}
+
+	return func(ctx context.Context) {
+		for i := len(closedFns) - 1; i > 0; i-- {
+			closedFns[i](ctx)
+		}
+	}
 }

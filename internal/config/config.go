@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-example/internal/log"
+	"go-example/internal/trace"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
@@ -19,6 +20,9 @@ func init() {
 
 // Config struct
 type Config struct {
+	Metadata struct {
+		ServiceName string
+	}
 	Server struct {
 		Port uint
 		Host string
@@ -29,7 +33,10 @@ type Config struct {
 			Max uint
 		}
 	}
-	Log zap.Config
+	Otel struct {
+		Log   zap.Config
+		Trace trace.Config
+	}
 }
 
 func (d Config) String() string {
