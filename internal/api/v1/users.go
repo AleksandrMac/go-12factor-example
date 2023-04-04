@@ -2,6 +2,7 @@ package v1
 
 import (
 	"go-example/internal/dto"
+	_ "go-example/internal/entities"
 	"go-example/internal/errors"
 	"go-example/internal/services"
 	"net/http"
@@ -15,7 +16,7 @@ func NewUserAPI(db *gorm.DB) UserAPI {
 	return &userAPI{service: services.NewUserService(db)}
 }
 
-//UserAPI interface
+// UserAPI interface
 type UserAPI interface {
 	GetAllUser(c *gin.Context)
 	GetUser(c *gin.Context)
@@ -37,6 +38,8 @@ type userAPI struct {
 // @Failure 500 {object} dto.ErrorReply "Unknown error"
 // @Router /users [get]
 func (p *userAPI) GetAllUser(ctx *gin.Context) {
+	// var users *[]entities.User
+	// var err error
 	users, err := p.service.GetAllUser(dto.Pageable{})
 	if err != nil {
 		ctx.Error(errors.NewError(http.StatusBadRequest, err.Error()))

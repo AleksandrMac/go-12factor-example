@@ -11,6 +11,9 @@ otel:
   log:
     level: info
     development: false
-  trace:
-    proto: grpc
-    endpoint: localhost:30800
+  # trace:
+  #   proto: grpc
+  #   endpoint: localhost:30800
+  # metric:
+  #   proto: grpc
+  #   endpoint: localhost:30800

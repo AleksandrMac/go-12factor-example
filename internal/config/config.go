@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-example/internal/log"
+	"go-example/internal/metric"
 	"go-example/internal/trace"
 
 	"github.com/mitchellh/mapstructure"
@@ -34,8 +35,9 @@ type Config struct {
 		}
 	}
 	Otel struct {
-		Log   zap.Config
-		Trace trace.Config
+		Log    zap.Config
+		Trace  trace.Config
+		Metric metric.Config
 	}
 }
 

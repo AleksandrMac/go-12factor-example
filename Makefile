@@ -47,7 +47,7 @@ clean:
 	$(GOCMD) clean ./...
 	rm -rf ./dist/
 doc:
-	$(GOCMD) run github.com/swaggo/swag/cmd/swag@latest init -g cmd/server/start.go
+	$(GOCMD) run github.com/swaggo/swag/cmd/swag@latest init -g cmd/server/start.go --parseDependency
 download:
 	go mod download
 build-all: build-mac build-win build-linux

@@ -1,15 +1,25 @@
 package log
 
 import (
+	"context"
+	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"time"
 
+	chimw "github.com/go-chi/chi/middleware"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 type Level = zapcore.Level
+
+// Key to use when setting the request ID.
+type ctxKeyRequestID int
+
+// RequestIDKey is the key that holds the unique request ID in a request context.
+const RequestIDKey ctxKeyRequestID = 0
 
 const (
 	InfoLevel   Level = zap.InfoLevel   // 0, default level
@@ -48,6 +58,55 @@ func (l *Logger) Panic(msg string, fields ...Field) {
 }
 func (l *Logger) Fatal(msg string, fields ...Field) {
 	l.l.Fatal(msg, fields...)
+}
+
+// DefaultLogFormatter is a simple logger that implements a LogFormatter.
+type DefaultLogFormatter struct {
+	Logger  chimw.LoggerInterface
+	NoColor bool
+}
+
+type defaultLogEntry struct {
+	Logger  *zap.Logger
+	request *http.Request
+}
+
+func (l *Logger) NewLogEntry(r *http.Request) chimw.LogEntry {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+
+	entry := &defaultLogEntry{
+		Logger: l.l.With(
+			zap.String("x-request-id", GetReqID(r.Context())),
+			zap.String("method", r.Method),
+			zap.String("path", fmt.Sprintf("%s://%s%s %s\" ", scheme, r.Host, r.RequestURI, r.Proto)),
+			zap.String("from", r.RemoteAddr),
+		),
+		request: r,
+	}
+	return entry
+}
+
+func (l *defaultLogEntry) Write(status, bytes int, header http.Header, elapsed time.Duration, extra interface{}) {
+	l.Logger.Info(fmt.Sprint(extra), zap.Int("status", status), zap.Int("bytes", bytes), zap.Duration("elapsed", elapsed))
+}
+
+func (l *defaultLogEntry) Panic(v interface{}, stack []byte) {
+	l.Logger.DPanic(fmt.Sprint(v))
+}
+
+// GetReqID returns a request ID from the given context if one is present.
+// Returns the empty string if a request ID cannot be found.
+func GetReqID(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if reqID, ok := ctx.Value(chimw.RequestIDKey).(string); ok {
+		return reqID
+	}
+	return ""
 }
 
 // function variables for all field types

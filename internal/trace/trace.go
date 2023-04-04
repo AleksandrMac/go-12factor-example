@@ -35,9 +35,7 @@ type Tracer struct {
 
 // Initializes an OTLP exporter, and configures the corresponding trace and
 // metric providers.
-func InitTraceProvider(serviceName, serviceVersion string, cnf Config) (func(context.Context) error, error) {
-	ctx := context.Background()
-
+func InitTraceProvider(ctx context.Context, serviceName, serviceVersion string, cnf Config) (func(context.Context) error, error) {
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
 			// the service name used to display traces in backends
